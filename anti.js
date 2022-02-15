@@ -9350,32 +9350,86 @@ const five_letter_words = [
 	"ZUZIM",
 	"ZYMES"
 ]
-
-// Translate today's date into md5 hash
-let today = new Date();
-var offset = -300; //Timezone offset for EST in minutes.
-today.setTime(today.getTime()+today.getTimezoneOffset()+offset*60*1000);
-console.log(today);
-
-const month = today.getMonth() + 1; //months from 1-12
-const day = today.getDate();
-const year = today.getFullYear();
-const date_string = `${String(month)}${String(day)}${String(year)}`
-const formatted_date = `${String(month)}/${String(day)}/${String(year)}`
-$('.date').append(formatted_date)
-const hash = CryptoJS.MD5(date_string);
-const hash_string = hash.toString()
+const consonants = "bcdfghjklmnpqrstvwxyz"
 const split_hash = []
 const hash_nums = []
-console.log(hash_string)
+let solution = ""
+let hash_string = ""
+let game_on = true
+let current_row = [0, 5]
+let current_word = ""
+let score = 0
+let guessed_letters = ""
 
+$(document).ready(function() {
+  hashDate()
+  addRedLetters()
+	highlightTile()
+  setTimer()
+  
+  $(document).on('keydown', function(e) {
+    if (game_on) {
+      let pressed = e.key
+      insertLetter(pressed)
+    }
+  });
 
-// Split hash string into substrings of 3
-for (let j = 1; j < hash_string.length-3; j += 3) {
-  const slice = hash_string.slice(j, j+3)
-  split_hash.push(slice)
+  $("button").on('click', function(event) {
+    if (game_on) {
+      const key = $(this).attr('data-key') 
+      insertLetter(key)
+    }
+  });
+  
+  $(".close-icon").on('click', function(event) {
+    $(".overlay").css({'display' : 'none'})
+  });
+
+  $("#share-button").on('click', function(event) {
+    var $temp = $("<textarea>");
+    $("body").append($temp);
+    var date = $(".date-div").text().trim()
+    var score = $(".final-score").text().trim()
+    var avoid_letters = $(".avoid-letters-div").text().trim()
+    var emojis = $(".copy-row-1").html() + "\n" + 
+        $(".copy-row-2").html() + "\n" + 
+        $(".copy-row-3").html() + "\n" + 
+        $(".copy-row-4").html();
+    var full_text = date + "\n" + avoid_letters + "\n" + score + "\n" + emojis
+    $temp.val(full_text).select();
+    document.execCommand("copy");
+    $temp.remove();
+  });
+  
+});
+
+function hashDate() {
+    // Translate today's date into md5 hash
+  let today = new Date();
+  var offset = -300; //Timezone offset for EST in minutes.
+  today.setTime(today.getTime()+today.getTimezoneOffset()+offset*60*1000);
+  console.log(today);
+
+  const month = today.getMonth() + 1; //months from 1-12
+  const day = today.getDate();
+  const year = today.getFullYear();
+  const date_string = `${String(month)}${String(day)}${String(year)}`
+  const formatted_date = `${String(month)}/${String(day)}/${String(year)}`
+  $('.date').append(formatted_date)
+  const hash = CryptoJS.MD5(date_string);
+  hash_string = hash.toString()
+
+  // Split hash string into substrings of 3
+  for (let j = 1; j < hash_string.length-3; j += 3) {
+    const slice = hash_string.slice(j, j+3)
+    split_hash.push(slice)
+  }
+
+  // Convert each hash string into a number and add to hash_nums
+  for (const hash_string of split_hash) {
+    hash_nums.push(hexToDec(hash_string))
+  }
 }
-console.log(split_hash)
 
 // Converts a hex into a number
 function hexToDec(hexString){
@@ -9383,107 +9437,41 @@ function hexToDec(hexString){
   return num % 21
 }
 
-// Convert each hash string into a number and add to hash_nums
-for (const hash_string of split_hash) {
-  hash_nums.push(hexToDec(hash_string))
-}
-console.log(hash_nums)
-
-let game_on = true
-var usedLetters = [];
-const consonants = "bcdfghjklmnpqrstvwxyz"
-
-function getRandomLetter() {
-  var alreadyUsed = 0;
-  var letter;
-  while(alreadyUsed >= 0) {
-    var x = Math.floor(Math.random() * 21);
-    letter = consonants.slice(x);
-    alreadyUsed = usedLetters.indexOf(letter);
+function addRedLetters() {
+  k = 0
+  while (solution.length < 6) {
+    index = hash_nums[k]
+    const letter = consonants.slice(index, index+1)
+    if (!solution.includes(letter)) {
+      solution += letter
+    }
+    k += 1
   }
-  usedLetters.push(letter);
-  return letter;
-};
+  console.log(solution)
+  $('.avoid-letters').append(solution.toUpperCase())
 
-solution = ""
-k = 0
-while (solution.length < 6) {
-  index = hash_nums[k]
-  const letter = consonants.slice(index, index+1)
-  if (!solution.includes(letter)) {
-    solution += letter
-  }
-  k += 1
+  const solution_tiles = $('.row-solution').find('.tile')
+  solution_tiles.each(function(index) {
+    const letter = solution.slice(index, index + 1)
+    $(this).append(letter)
+    const button = $('#keyboard').find(`[data-key='${letter}']`)
+    button.attr('data-state', 'submitted-in-word')
+  })
 }
-console.log(solution)
-$('.avoid-letters').append(solution.toUpperCase())
-// function getRandomConsonants(arr){
-//   let answer = "", counter = 0;
- 
-//   while(counter < 6){
-//     let rand = arr[Math.floor(Math.random() * arr.length)];
-//     if(!answer.includes(rand)){
-//       answer += rand;
-//       counter++;
-//     }
-//   }
-  
-//   return answer;
-// }
 
-// // Generate 5 random consonants
-// const solution = getRandomConsonants(consonants)
-
-// Get solution tiles and letters to the tiles
-
-const solution_tiles = $('.row-solution').find('.tile')
-solution_tiles.each(function(index) {
-  const letter = solution.slice(index, index + 1)
-	$(this).append(letter)
-  const button = $('#keyboard').find(`[data-key='${letter}']`)
-  button.attr('data-state', 'submitted-in-word')
-})
 // highlight first empty .tile
 function highlightTile() {
   const first_empty = $(".board").find('.tile:empty').first()
 	first_empty.addClass("clicked")
 }
 
-$(document).ready(function() {
-	highlightTile()
-  setTimer()
-});
-
-// Current row being worked on
-let current_row = [0, 5]
-
-let current_word = ""
-let score = 0
-let guessed_letters = ""
-
-$(document).on('keydown', function(e) {
-  if (game_on) {
-    let pressed = e.key
-    insertLetter(pressed)
-  }
-});
-
-$("button").on('click', function(event) {
-  if (game_on) {
-    const key = $(this).attr('data-key') 
-    insertLetter(key)
-  }
-});
-
+// This function is way too big
 function insertLetter(pressed) {
   // Listen for keypresses and find next tile to add "clicked" class to
 	const clicked_tile = $('.clicked')
 	const parent_slot = clicked_tile.closest('.slot')
 	const next_slot = parent_slot.nextAll(".slot:first")
   const next_row = parent_slot.parent().next()
-  // if (next_row.attr('class') == "row row-solution") {
-  //   game_on = false
-  // }
 	const next_tile = next_slot.children(".tile")
 	if ($(".clicked")[0]) {
 		const isLetter = /^[a-z]$/i.test(pressed)
@@ -9500,6 +9488,8 @@ function insertLetter(pressed) {
 	// If there is not a next tile, that means we are on the last tile in the row
 	// If that is the case, listen for "Enter" key to submit word
 	if (next_tile.length == 0 && pressed == "Enter" && game_on) {
+    $("button").blur();
+    console.log("pressed Enter")
 		const tile_slice = $('.tile').slice(current_row[0], current_row[1])
     const parent_row = tile_slice.closest(".row")
     const row_number = parent_row.attr('class').slice(-1)
@@ -9575,26 +9565,6 @@ function insertLetter(pressed) {
 	}
 }
 
-$(".close-icon").on('click', function(event) {
-  $(".overlay").css({'display' : 'none'})
-});
-
-$("#share-button").on('click', function(event) {
-  var $temp = $("<textarea>");
-  $("body").append($temp);
-  var date = $(".date-div").text().trim()
-  var score = $(".final-score").text().trim()
-  var avoid_letters = $(".avoid-letters-div").text().trim()
-  var emojis = $(".copy-row-1").html() + "\n" + 
-      $(".copy-row-2").html() + "\n" + 
-      $(".copy-row-3").html() + "\n" + 
-      $(".copy-row-4").html();
-  var full_text = date + "\n" + avoid_letters + "\n" + score + "\n" + emojis
-  $temp.val(full_text).select();
-  document.execCommand("copy");
-  $temp.remove();
-});
-
 function setTimer() {
   var date = new Date();
   var second = date.getSeconds();
@@ -9604,7 +9574,6 @@ function setTimer() {
   var leftHour = 23 - hour;
   var leftMinute = 59 - minute;
   var leftSeconds = 59 - second;
-
 
   var leftTime = (leftHour * 3600) + (leftMinute * 60) + leftSeconds;
   var timer = $(".timer");
