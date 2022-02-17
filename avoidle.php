@@ -260,7 +260,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <p class="example-text">The letter <b>N</b> is a red letter, so JUNKY is worth 4 points.</p>
+                            <p class="example-text">The letter <b>K</b> is a red letter, so JUNKY is worth 4 points.</p>
                             <div class="example">
                                 <div class="row">
                                     <div class="slot">
