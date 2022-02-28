@@ -586,7 +586,7 @@
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/aes.js"></script>
-        <script type="text/javascript" src="js/avoidle.js?version=4"></script>
+        <script type="text/javascript" src="js/avoidle.js?version=5"></script>
     </body>
 
     <footer></footer>
