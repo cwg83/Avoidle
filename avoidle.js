@@ -9385,7 +9385,7 @@ const five_letter_words = [
     "ZYMES"
 ]
 
-const consonants = "bcdfghjklmnpqrstvwxyz"
+const consonants = "bcdfghjklmnpqrstvwxz"
 const split_hash = []
 const hash_nums = []
 let solution = ""
