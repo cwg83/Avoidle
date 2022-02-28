@@ -9384,23 +9384,35 @@ const five_letter_words = [
     "ZUZIM",
     "ZYMES"
 ]
+
 const consonants = "bcdfghjklmnpqrstvwxyz"
 const split_hash = []
 const hash_nums = []
 let solution = ""
 let hash_string = ""
 let game_on = true
-let current_row = [0, 5]
 let current_word = ""
 let score = 0
 let guessed_letters = ""
+let formatted_date = ""
+let savedStats = false
+let playedToday = false
+let last_row = ""
+let games = 0
+const filled_rows = []
 
 $(document).ready(function() {
   hashDate()
-  addRedLetters()
-	highlightTile()
   setTimer()
-  
+  getScores()
+  checkSavedStats()
+
+  // Add the red "avoid" letters to the board
+  addRedLetters()
+
+  // Highlight first empty tile
+	highlightTile()
+
   $(document).on('keydown', function(e) {
     if (game_on) {
       let pressed = e.key
@@ -9408,7 +9420,31 @@ $(document).ready(function() {
     }
   });
 
-  $("button").on('click', function(event) {
+  setClickEvents()
+  
+});
+
+function checkSavedStats() {
+    // If user has saved stats, do not display instructions
+    if (savedStats) {
+      $(".overlay").css({'display' : 'none'})
+      $(".pop-up-instructions").css({'display' : 'none'})
+    }
+    if (localStorage.getItem('night-mode') == "true"){
+      $("body").addClass("night-mode")
+      $(".pop-up").addClass("night-mode")
+      $(".nightmode-switch").attr("checked", true)
+    }
+    // If user played today, display stats
+    if (playedToday) {
+      $('.share').css('display', 'flex')
+      $(".overlay").css({'display' : 'flex'})
+      $(".pop-up-stats").css({'display' : 'flex'})
+    }
+}
+
+function setClickEvents() {
+  $(".keyboard-button").on('click', function(event) {
     if (game_on) {
       const key = $(this).attr('data-key') 
       insertLetter(key)
@@ -9420,46 +9456,136 @@ $(document).ready(function() {
     $(".pop-up-instructions").css({'display' : 'flex'})
   });
 
-  $(".close-icon-end").on('click', function(event) {
-    $(".overlay").css({'display' : 'none'})
-    $(".pop-up-end").css({'display' : 'none'})
+  $(".row-delete").on('click', function(event) {
+    deleteRow($(this))
   });
 
-  $(".close-icon-instructions").on('click', function(event) {
+  $("#stats-button").on('click', function(event) {
+    getScores()
+    $(".overlay").css({'display' : 'flex'})
+    $(".pop-up-stats").css({'display' : 'flex'})
+  });
+
+  $("#settings-button").on('click', function(event) {
+    $(".overlay").css({'display' : 'flex'})
+    $(".pop-up-settings").css({'display' : 'flex'})
+  });
+
+  $("#faq-link").on('click', function(event) {
+    $(".pop-up-faq").css({'display' : 'flex'})
+    return false
+  });
+
+  $(".faq-close-icon").on('click', function(event) {
+    $(".pop-up-faq").css({'display' : 'none'})
+  });
+
+  $(".close-icon").on('click', function(event) {
     $(".overlay").css({'display' : 'none'})
-    $(".pop-up-instructions").css({'display' : 'none'})
+    $(".pop-up").css({'display' : 'none'})
   });
 
   $("#share-button").on('click', function(event) {
-    var $temp = $("<textarea>");
-    $("body").append($temp);
-    var date = $(".date-div").text().trim()
-    var score = $(".final-score").text().trim()
-    var avoid_letters = $(".avoid-letters-div").text().trim()
-    var emojis = $(".copy-row-1").html() + "\n" + 
-        $(".copy-row-2").html() + "\n" + 
-        $(".copy-row-3").html() + "\n" + 
-        $(".copy-row-4").html();
-    var full_text = date + "\n" + avoid_letters + "\n" + score + "\n" + emojis
-    $temp.val(full_text).select();
-    document.execCommand("copy");
-    $temp.remove();
+    $(".invalid-message").empty()
+    $(".invalid-message").append("Copied results to clipboard")
+    $(".invalid-message").addClass("message-fadein")
+      $(".invalid-message").on("animationend", function(){
+          $(this).removeClass("message-fadein");
+      });
+    copyResults()
   });
-  
-});
+}
 
+function nightModeSwitch(obj) {
+  if ($(obj).is(":checked")) {
+    $("body").addClass("night-mode")
+    $(".pop-up").addClass("night-mode")
+    localStorage.setItem('night-mode', "true")
+  } else {
+    $("body").removeClass("night-mode")
+    $(".pop-up").removeClass("night-mode")
+    localStorage.setItem('night-mode', "false")
+  }
+
+}
+
+// Copies score and results emojis to clipboard
+function copyResults() {
+  var $temp = $("<textarea>");
+  $("body").append($temp);
+  var date = $(".date-div").text().trim()
+  var final_score = $(".final-score").text().trim()
+  var avoid_letters = $(".avoid-letters-div").text().trim()
+  var emojis = $(".copy-row-1").html() + "\n" + 
+      $(".copy-row-2").html() + "\n" + 
+      $(".copy-row-3").html() + "\n" + 
+      $(".copy-row-4").html();
+  var full_text = date + "\n" + avoid_letters + "\n" + final_score + "\n" + emojis
+  $temp.val(full_text).select();
+  document.execCommand("copy");
+  $temp.remove();
+}
+
+// Deletes the submitted word from a row
+function deleteRow(row) {
+  const row_number = row.parent().attr('class').split(' ')[1]
+  const related_tiles = row.parent().children().children(".tile")
+
+  for (var i = filled_rows.length - 1; i >= 0; --i) {
+    if (filled_rows[i] == row_number) {
+      filled_rows.splice(i,1);
+    }
+  }
+  colorTiles()
+  related_tiles.empty()
+  related_tiles.attr('data-state', 'empty')
+  $('.tile').removeClass('clicked')
+  // score -= related_row.attr('data-score')
+  // related_row.attr('data-score', 0)
+  $('.score').empty()
+  $('.score').append(score)
+  highlightTile()
+  row.css('display', 'none')
+}
+
+function colorTiles() {
+  const keyboard_buttons = $(".keyboard-button[data-state!='submitted-in-word']")
+  keyboard_buttons.attr('data-state', 'empty')
+  $('.copy-row').empty()
+  let used_letters = ""
+  score = 0
+  $.each(filled_rows, function(index, row) {
+    const related_row_number = row.slice(-1)
+    const filled_tiles = $(`.${row}`).children().children('.tile')
+    filled_tiles.each(function(index) {
+      const letter = $(this).html()
+      guessed_letters = guessed_letters.replace(letter, "", 1)
+      const related_button = $('#keyboard').find(`[data-key='${letter}']`)
+      if (solution.includes(letter)) {
+        $(this).attr('data-state', 'submitted-in-word')
+        $(`.copy-row-${related_row_number}`).append('🟥')
+        used_letters += letter
+      } else if (used_letters.includes(letter)) {
+        $(this).attr('data-state', 'submitted-guessed')
+        $(`.copy-row-${related_row_number}`).append('⬜')
+        used_letters += letter
+      } else {
+        $(this).attr('data-state', 'submitted-not-in-word')
+        related_button.attr('data-state', 'submitted-not-in-word')
+        $(`.copy-row-${related_row_number}`).append('🟩')
+        used_letters += letter
+        score += 1
+      }
+    })
+  })
+}
+
+// Convert date into md5 hash and use that has to generate 6 random consonants
 function hashDate() {
     // Translate today's date into md5 hash
-  let today = new Date();
-  var offset = -300; //Timezone offset for EST in minutes.
-  today.setTime(today.getTime()+today.getTimezoneOffset()+offset*60*1000);
-  console.log(today);
-
-  const month = today.getMonth() + 1; //months from 1-12
-  const day = today.getDate();
-  const year = today.getFullYear();
-  const date_string = `${String(month)}${String(day)}${String(year)}`
-  const formatted_date = `${String(month)}/${String(day)}/${String(year)}`
+  const estToday = new Date().toLocaleString("en-US", {timeZone: "America/New_York"})
+  const date_string = estToday.split(',')[0].replaceAll("/", "")
+  formatted_date = estToday.split(',')[0]
   $('.date').append(formatted_date)
   const hash = CryptoJS.MD5(date_string);
   hash_string = hash.toString()
@@ -9482,6 +9608,7 @@ function hexToDec(hexString){
   return num % 21
 }
 
+// Add the red "avoid" letters to the red row
 function addRedLetters() {
   k = 0
   while (solution.length < 6) {
@@ -9492,9 +9619,7 @@ function addRedLetters() {
     }
     k += 1
   }
-  console.log(solution)
   $('.avoid-letters').append(solution.toUpperCase())
-
   const solution_tiles = $('.row-solution').find('.tile')
   solution_tiles.each(function(index) {
     const letter = solution.slice(index, index + 1)
@@ -9506,18 +9631,23 @@ function addRedLetters() {
 
 // highlight first empty .tile
 function highlightTile() {
+  const filled_tiles = $('[data-state="filled"')
+  filled_tiles.empty()
+  filled_tiles.attr('data-state', 'empty')
   const first_empty = $(".board").find('.tile:empty').first()
 	first_empty.addClass("clicked")
 }
 
-// This function is way too big
 function insertLetter(pressed) {
   // Listen for keypresses and find next tile to add "clicked" class to
 	const clicked_tile = $('.clicked')
 	const parent_slot = clicked_tile.closest('.slot')
-	const next_slot = parent_slot.nextAll(".slot:first")
-  const next_row = parent_slot.parent().next()
-	const next_tile = next_slot.children(".tile")
+  const next_slot = parent_slot.nextAll(".slot:first")
+  const next_tile = next_slot.children(".tile")
+  if (parent_slot.parent().attr('class') != undefined) {
+    const parent_row = parent_slot.parent()
+    last_row = parent_row
+  }
 	if ($(".clicked")[0]) {
 		const isLetter = /^[a-z]$/i.test(pressed)
 		if (isLetter) {
@@ -9530,108 +9660,209 @@ function insertLetter(pressed) {
 			$(next_tile).addClass("clicked");
 		}
 	}
-	// If there is not a next tile, that means we are on the last tile in the row
-	// If that is the case, listen for "Enter" key to submit word
-	if (next_tile.length == 0 && pressed == "Enter" && game_on) {
-    $("button").blur();
-    console.log("pressed Enter")
-		const tile_slice = $('.tile').slice(current_row[0], current_row[1])
-    const parent_row = tile_slice.closest(".row")
-    const row_number = parent_row.attr('class').slice(-1)
 
-		tile_slice.each(function(index) {
-			current_word += $(this).html().toUpperCase();
-		});
-		// If word is in list of valid words
-		if (five_letter_words.indexOf(current_word) != -1) {
-      // Add data-state to each tile and each keyboard button
-			const filled_tiles = $(".tile[data-state='filled']");
-			filled_tiles.each(function(index) {
-        console.log($(this).html())
-        const current_letter = $(this).html()
-        const button = $('#keyboard').find(`[data-key='${current_letter}']`)
-				if (guessed_letters.indexOf($(this).html()) != -1) {
-					$(this).attr('data-state', 'submitted-guessed')
-          $(`.copy-row-${row_number}`).append("⬜")
-				} else if (solution.indexOf($(this).html()) != -1) {
-					$(this).attr('data-state', 'submitted-in-word')
-          $(`.copy-row-${row_number}`).append("🟥")
-				} else {
-					$(this).attr('data-state', 'submitted-not-in-word')
-          button.attr('data-state', 'submitted-not-in-word')
-          $(`.copy-row-${row_number}`).append("🟩")
-					score += 1
-				}
-				guessed_letters += $(this).html()
-			})
-      // Generate score and insert it 
-			$('.score').empty()
-			$('.score').append(score)
-			const next_empty_tile = $(".tile[data-state='empty']:first")
-			next_empty_tile.addClass("clicked")
-      // Activate next row of tiles
-			current_row[0] += 5
-			current_row[1] += 5
-			current_word = ""
-		} else {
-      // else if typed-in word is not valid
-			current_word = ""
-      console.log("not a word")
-      parent_row.addClass("invalid")
-      // Add "invalid" Shake animation to the row
-      parent_row.on("animationend", function(){
-          $(this).removeClass("invalid");
-      });
-      // Display "invalid" message
-      $(".invalid-message").addClass("message-fadein")
-      $(".invalid-message").on("animationend", function(){
-          $(this).removeClass("message-fadein");
-      });
-		}
-    // If word entered was in the last row, game ends
-    if (parent_row.attr('class') == "row row-4") {
-      game_on = false
-      $(".overlay").css({'display' : 'flex'})
-      $(".pop-up-end").css({'display' : 'flex'})
-      $(".overlay-score").append(score)
-    }
+	// If last tile in the row and Enter is clicked, submit the word
+	if (clicked_tile.attr('class') == undefined && pressed == "Enter" && game_on) {
+    submitWord()
 	}
+
+  // If backspace is pressed, delete last letter entered
 	if (pressed == "Backspace") {
-    // Delete last typed letter
-		const last_filled_tile = $(".tile[data-state='filled']:last")
-    const clicked_parent = clicked_tile.parent()
+    deleteLetter(clicked_tile)
+	}
+}
+
+function submitWord() {
+  $("button").blur();
+  const tile_slice = last_row.children().children('.tile')
+  const parent_row = tile_slice.closest(".row")
+  const delete_button = parent_row.children().last()
+  tile_slice.each(function(index) {
+    current_word += $(this).html().toUpperCase();
+  });
+  // If word is in list of valid words
+  if (five_letter_words.indexOf(current_word) != -1) {
+    filled_rows.push(parent_row.attr('class').split(' ')[1])
+    delete_button.css('display', 'flex')
+    // Add data-state to each tile and each keyboard button and append emojis to results area
+    colorTiles()
+    // Generate score and insert it 
+    $('.score').empty()
+    $('.score').append(score)
+    const next_empty_tile = $(".tile[data-state='empty']:first")
+    next_empty_tile.addClass("clicked")
+    // Activate next row of tiles
+    current_word = ""
+  } else {
+    // else if typed-in word is not valid
+    current_word = ""
+    parent_row.addClass("invalid")
+    // Add "invalid" Shake animation to the row
+    parent_row.on("animationend", function(){
+        $(this).removeClass("invalid");
+    });
+    // Display "invalid" message
+    $(".invalid-message").addClass("message-fadein")
+    $(".invalid-message").on("animationend", function(){
+        $(this).removeClass("message-fadein");
+    });
+  }
+  // If word entered was in the last row, game ends
+  if (parent_row.attr('class') == "row row-4") {
+    endGame()
+  }
+}
+
+// Delete last typed (and not submitted) letter
+function deleteLetter(last_clicked) {
+    const last_filled_tile = $(".tile[data-state='filled']:last")
+    const parent_slot = last_clicked.parent()
     // If the deleted letter is not in the first child tile
-    if (!clicked_parent.is(':first-child')) {
+    if (!parent_slot.is(':first-child')) {
       last_filled_tile.addClass("clicked")
-      clicked_tile.removeClass("clicked")
+      last_clicked.removeClass("clicked")
       last_filled_tile.empty()
       last_filled_tile.attr('data-state', 'empty')
       last_filled_tile.removeClass("already-guessed")
     }
-	}
 }
 
+// Save board, emojis, and keyboard state to local storage and get final score
+function endGame() {
+  game_on = false
+  // $('.overlay-scoreboard').css('display', 'flex')
+  const savedBoard = $(".board").html()
+  localStorage.setItem('todays_board', savedBoard)
+  const emojis_div = $(".emojis").html()
+
+  localStorage.setItem('emojis', emojis_div)
+  const savedKeyboard = $('#keyboard').html()
+
+  localStorage.setItem('keyboard', savedKeyboard)
+  $(".overlay").css({'display' : 'flex'})
+  $(".pop-up-stats").css({'display' : 'flex'})
+  $(".overlay-score").append(score)
+  saveScore(formatted_date, score)
+  $('.share').css('display', 'flex')
+  // getScores()
+  getScores()
+}
+
+function getScores() {
+  // Create variable for scores existing in local storage
+  const scores = JSON.parse(localStorage.getItem('scores'))
+  // If there are previous scores
+  if (scores) {
+
+    // Current number of games is equal to length of scores existing in local storage
+    games = Object.keys(scores).length
+    savedStats = true
+    // If score with today's date exists
+    if (scores[formatted_date]) {
+      playedToday = true
+      saved_score = scores[formatted_date]
+
+      $('.score').empty()
+      $('.score').append(saved_score)
+      $('.overlay-score').empty()
+      $('.overlay-score').append(saved_score)
+    }
+
+    $('.games-played').empty()
+    $('.games-played').append(games)
+  
+    total_scores = 0
+    var score_counts = {"1517": 0, "1014": 0, "less10": 0, 18: 0, 19: 0, 20: 0}
+    Object.entries(scores).forEach(([key, value]) => {
+      total_scores += value
+      if (value < 10) {
+        score_counts["less10"] += 1
+      } else if (10 <= value && value <= 14) {
+        score_counts["1014"] += 1
+      } else if (15 <= value && value <= 17) {
+        score_counts["1517"] += 1
+      } else score_counts[value] += 1;
+    })
+
+    $(".graph-bar").empty()
+    Object.entries(score_counts).forEach(([key, value]) => {
+      id_string = "bar" + key
+      document.getElementById(id_string).innerHTML = value
+      let percentage = (value / games) * 100
+
+      if (value > 0) {
+        document.getElementById(id_string).style.width = percentage + '%'
+      }
+    })
+
+    average_score = (total_scores / games)
+    if (!Number.isInteger(average_score)) {
+      average_score = average_score.toFixed(2)
+    }
+    $('.average-score').empty()
+    $('.average-score').append(average_score)
+  }
+  if (playedToday) {
+    // $('.overlay-scoreboard').css('display', 'flex')
+    $('.board').empty()
+    $('.board').append(localStorage.getItem('todays_board'))
+    $('.emojis').empty()
+    $('.emojis').append(localStorage.getItem('emojis'))
+    $('#keyboard').empty()
+    $('#keyboard').append(localStorage.getItem('keyboard'))
+    $(".overlay").css({'display' : 'flex'})
+    $(".pop-up-stats").css({'display' : 'flex'})
+    $('.row-delete').css('display', 'none')
+  }
+}
+
+
+// Save current score to localStorage
+function saveScore(date, score) {
+  storage = localStorage.getItem('scores')
+  if (storage) {
+    storage = storage ? storage.split(',') : {}
+    storage_json = JSON.parse(storage)
+  } else {
+    storage_json = {}
+  }
+  storage_json[date] = score
+  localStorage.setItem('scores', JSON.stringify(storage_json))
+  
+}
+
+// Initialize countdown to next new game (midnight EST)
 function setTimer() {
-  var date = new Date();
-  var second = date.getSeconds();
-  var minute = date.getMinutes();
-  var hour = date.getHours();
+  let date = new Date();
 
-  var leftHour = 23 - hour;
-  var leftMinute = 59 - minute;
-  var leftSeconds = 59 - second;
+  let estDate = new Date(date.toLocaleString('en-US', {timeZone: 'America/New_York'}))
 
-  var leftTime = (leftHour * 3600) + (leftMinute * 60) + leftSeconds;
-  var timer = $(".timer");
+  let second = estDate.getSeconds();
+  let minute = estDate.getMinutes();
+  let hour = estDate.getHours();
 
+  let leftHour = 23 - hour;
+  let leftMinute = 59 - minute;
+  let leftSeconds = 59 - second;
+
+  let leftTime = (leftHour * 3600) + (leftMinute * 60) + leftSeconds;
+  let timer = $(".timer");
+
+  updateTimer()
   setInterval(updateTimer, 1000);
 
   function updateTimer() {
-      var h = Math.floor(leftTime / 3600);
-      var m = Math.floor((leftTime - (h * 3600)) / 60);
-      var s = Math.floor(leftTime % 60);
+      let h = Math.floor(leftTime / 3600);
+      let m = Math.floor((leftTime - (h * 3600)) / 60);
+      if (m < 10) {
+        m = "0" + m
+      }
+      let s = Math.floor(leftTime % 60);
+      if (s < 10) {
+        s = "0" + s
+      }
       $(".timer").empty()
-      $(".timer").append(h + ":" + m + ":" + (s+1))
+      $(".timer").append(h + ":" + m + ":" + (s))
 
       leftTime--;
   }
